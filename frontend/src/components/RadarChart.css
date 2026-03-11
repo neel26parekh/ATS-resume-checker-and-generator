@@ -1,0 +1,10 @@
+/* RadarChart.css */
+.radar-chart {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.radar-chart canvas {
+    max-width: 100%;
+}

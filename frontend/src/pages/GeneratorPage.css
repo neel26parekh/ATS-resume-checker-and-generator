@@ -1,0 +1,185 @@
+/* GeneratorPage.css — Resume Generator page */
+
+.generator-page {
+    padding: var(--space-8) 0 var(--space-16);
+}
+
+/* ── Grid Layout ──────────────────────────────────────────────────────────── */
+.generator-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: var(--space-8);
+    align-items: start;
+}
+
+.form-column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+}
+
+.config-column {
+    position: sticky;
+    top: 80px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+}
+
+/* ── Form Sections ────────────────────────────────────────────────────────── */
+.form-section {
+    padding: var(--space-6);
+}
+
+.form-section-title {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--space-5);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.form-row:last-child {
+    margin-bottom: 0;
+}
+
+.repeatable-item {
+    margin-bottom: var(--space-4);
+}
+
+.item-divider {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: var(--space-5) 0;
+}
+
+.add-btn {
+    margin-top: var(--space-3);
+    width: 100%;
+}
+
+/* ── Template Selection ───────────────────────────────────────────────────── */
+.template-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+}
+
+.template-card {
+    padding: var(--space-4);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition-base);
+    background: var(--color-bg-glass);
+}
+
+.template-card:hover {
+    border-color: var(--border-color-hover);
+}
+
+.template-card.selected {
+    border-color: var(--color-accent-blue);
+    background: rgba(59, 130, 246, 0.08);
+    box-shadow: var(--shadow-glow-blue);
+}
+
+.template-preview {
+    font-size: 2.5rem;
+    margin-bottom: var(--space-2);
+}
+
+.template-name {
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-1);
+}
+
+.template-desc {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+/* ── Generate Button ──────────────────────────────────────────────────────── */
+.generate-btn {
+    width: 100%;
+}
+
+.generator-error {
+    text-align: center;
+    color: var(--color-accent-red);
+    font-size: var(--font-size-sm);
+}
+
+/* ── Generation Result ────────────────────────────────────────────────────── */
+.generation-result {
+    padding: var(--space-6);
+}
+
+.result-title {
+    font-size: var(--font-size-xl);
+    margin-bottom: var(--space-2);
+}
+
+.result-message {
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-5);
+    font-size: var(--font-size-sm);
+}
+
+.result-actions {
+    display: flex;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.compilation-warning {
+    margin-top: var(--space-4);
+    padding: var(--space-4);
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: var(--border-radius-md);
+}
+
+.warning-title {
+    font-weight: 600;
+    color: #fbbf24;
+    margin-bottom: var(--space-2);
+    font-size: var(--font-size-sm);
+}
+
+.warning-text {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-2);
+}
+
+.warning-hint {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+    .generator-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .config-column {
+        position: static;
+    }
+}
+
+@media (max-width: 600px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .template-grid {
+        grid-template-columns: 1fr;
+    }
+}

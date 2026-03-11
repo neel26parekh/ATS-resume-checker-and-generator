@@ -1,0 +1,76 @@
+/* Header.css — Navigation bar styles */
+
+.header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10, 14, 26, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+}
+
+.header-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    color: var(--color-text-primary);
+    font-weight: 700;
+    font-size: var(--font-size-lg);
+    text-decoration: none;
+}
+
+.header-logo {
+    font-size: 1.5rem;
+}
+
+.header-title {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.header-nav {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.header-link {
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--border-radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    transition: all var(--transition-fast);
+}
+
+.header-link:hover {
+    color: var(--color-text-primary);
+    background: var(--color-bg-hover);
+}
+
+.header-link.active {
+    color: var(--color-text-primary);
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+@media (max-width: 600px) {
+    .header-title {
+        display: none;
+    }
+
+    .header-link {
+        font-size: var(--font-size-xs);
+        padding: var(--space-2) var(--space-3);
+    }
+}

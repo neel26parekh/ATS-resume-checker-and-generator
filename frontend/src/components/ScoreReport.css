@@ -1,0 +1,204 @@
+/* ScoreReport.css — ATS score display styles */
+
+.score-report {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+}
+
+/* ── Score Hero Section ───────────────────────────────────────────────────── */
+.score-hero {
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+    padding: var(--space-8);
+    background: var(--color-bg-card);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-xl);
+}
+
+.score-ring {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    flex-shrink: 0;
+}
+
+.score-ring-svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.score-ring-bg {
+    fill: none;
+    stroke: var(--border-color);
+    stroke-width: 8;
+}
+
+.score-ring-fill {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dasharray 1s ease;
+}
+
+.score-ring-content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.score-number {
+    font-size: var(--font-size-4xl);
+    font-weight: 800;
+    line-height: 1;
+}
+
+.score-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}
+
+.score-info {
+    flex: 1;
+}
+
+.grade-badge {
+    display: inline-block;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--border-radius-md);
+    font-weight: 700;
+    font-size: var(--font-size-lg);
+    border: 1px solid;
+    margin-bottom: var(--space-3);
+}
+
+.score-summary {
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+}
+
+/* ── Section Titles ───────────────────────────────────────────────────────── */
+.score-section {
+    background: var(--color-bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    padding: var(--space-8);
+}
+
+.section-title {
+    font-size: var(--font-size-xl);
+    margin-bottom: var(--space-6);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* ── Dimension Progress Bars ──────────────────────────────────────────────── */
+.dimensions-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+.dimension-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.dimension-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dimension-name {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+}
+
+.dimension-value {
+    font-weight: 700;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-accent);
+}
+
+.dimension-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--color-bg-input);
+    overflow: hidden;
+}
+
+.dimension-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s ease;
+}
+
+.dimension-details {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+/* ── Keywords Section ─────────────────────────────────────────────────────── */
+.keywords-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-6);
+}
+
+.keywords-label {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    margin-bottom: var(--space-3);
+}
+
+.keywords-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.keyword-tag {
+    padding: var(--space-1) var(--space-3);
+    border-radius: 999px;
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+}
+
+.keyword-tag.found {
+    background: rgba(16, 185, 129, 0.12);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.keyword-tag.missing {
+    background: rgba(239, 68, 68, 0.12);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* ── Chart Container ──────────────────────────────────────────────────────── */
+.score-chart-container {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-4);
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .score-hero {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .keywords-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,0 +1,53 @@
+/* SuggestionPanel.css */
+
+.suggestion-group {
+    margin-bottom: var(--space-6);
+}
+
+.suggestion-group:last-child {
+    margin-bottom: 0;
+}
+
+.suggestion-group-title {
+    margin-bottom: var(--space-3);
+}
+
+.suggestion-card {
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    background: var(--color-bg-glass);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    margin-bottom: var(--space-3);
+    transition: border-color var(--transition-fast);
+}
+
+.suggestion-card:hover {
+    border-color: var(--border-color-hover);
+}
+
+.suggestion-icon {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.suggestion-content {
+    flex: 1;
+}
+
+.suggestion-category {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.suggestion-message {
+    margin-top: var(--space-1);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+}

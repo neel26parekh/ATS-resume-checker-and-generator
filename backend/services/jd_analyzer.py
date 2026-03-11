@@ -1,0 +1,167 @@
+"""
+Job Description Analyzer Service
+==================================
+Analyzes raw job description text using Google Gemini AI to extract
+structured data: required skills, preferred skills, experience level,
+education requirements, responsibilities, and ATS keywords.
+
+This is a critical input for the scoring engine — the quality of JD
+analysis directly impacts the accuracy of ATS scores.
+
+Usage:
+    from services.jd_analyzer import analyze_job_description
+
+    jd_data = await analyze_job_description("We are looking for a Senior...")
+    print(jd_data.required_skills)
+"""
+
+import json
+import re
+
+import google.generativeai as genai
+
+from config import settings
+from api.models.job import JobDescription
+
+
+# ── Gemini Configuration ────────────────────────────────────────────────────
+
+def _configure_gemini() -> genai.GenerativeModel:
+    """
+    Configure and return a Gemini generative model instance.
+
+    Returns:
+        Configured GenerativeModel for text generation.
+
+    Raises:
+        RuntimeError: If the Gemini API key is not configured.
+    """
+    if not settings.is_gemini_configured:
+        raise RuntimeError(
+            "Gemini API key is not configured. "
+            "Set GEMINI_API_KEY in your .env file."
+        )
+
+    genai.configure(api_key=settings.GEMINI_API_KEY)
+    return genai.GenerativeModel("gemini-1.5-flash")
+
+
+# ── JD Analysis Prompt ──────────────────────────────────────────────────────
+# This prompt is carefully engineered to produce consistent, structured output.
+
+JD_ANALYSIS_PROMPT = """
+You are an expert ATS (Applicant Tracking System) analyst. Analyze the following 
+job description and extract structured information.
+
+Return your analysis as a JSON object with EXACTLY these fields:
+{
+    "title": "The job title",
+    "company": "Company name (or empty string if not found)",
+    "required_skills": ["list of must-have skills and technologies"],
+    "preferred_skills": ["list of nice-to-have / preferred skills"],
+    "experience_level": "Required experience (e.g., '3-5 years', 'Senior', 'Entry Level')",
+    "education": "Education requirement (e.g., 'BS in Computer Science')",
+    "responsibilities": ["list of key job responsibilities (top 5-8)"],
+    "industry": "Industry or domain (e.g., 'FinTech', 'Healthcare', 'E-commerce')",
+    "keywords": ["ALL important keywords an ATS would scan for, including skills, tools, methodologies, certifications"]
+}
+
+Rules:
+- Extract ONLY what is explicitly mentioned in the JD. Do not infer or add skills not mentioned.
+- Keywords should include ALL terms an ATS would match: technical skills, soft skills, 
+  tools, frameworks, methodologies, certifications, and industry-specific terms.
+- Separate required vs preferred skills carefully. If the JD says "nice to have" or "preferred",
+  put those in preferred_skills.
+- Return ONLY the JSON object, nothing else. No markdown, no explanation.
+
+JOB DESCRIPTION:
+{job_description}
+"""
+
+
+# ── Public API ──────────────────────────────────────────────────────────────
+
+async def analyze_job_description(jd_text: str) -> JobDescription:
+    """
+    Analyze a job description using Gemini AI and return structured data.
+
+    This function sends the JD text to Gemini with a carefully engineered
+    prompt, parses the JSON response, and returns a validated JobDescription.
+
+    Args:
+        jd_text: Raw job description text (copy-pasted from a job posting).
+
+    Returns:
+        JobDescription with structured data extracted from the JD.
+
+    Raises:
+        RuntimeError: If Gemini API is not configured.
+        ValueError: If the AI response cannot be parsed as valid JSON.
+    """
+    model = _configure_gemini()
+
+    # Build the prompt with the JD text
+    prompt = JD_ANALYSIS_PROMPT.format(job_description=jd_text)
+
+    # Call Gemini API
+    response = model.generate_content(prompt)
+    response_text = response.text.strip()
+
+    # Parse the JSON response
+    parsed_data = _parse_ai_response(response_text)
+
+    return JobDescription(**parsed_data)
+
+
+async def extract_keywords_from_jd(jd_text: str) -> list[str]:
+    """
+    Quick keyword extraction from a JD — a lighter alternative to full analysis.
+
+    Uses the full analyzer under the hood but returns only the keywords list.
+
+    Args:
+        jd_text: Raw job description text.
+
+    Returns:
+        List of ATS-relevant keywords from the JD.
+    """
+    jd_data = await analyze_job_description(jd_text)
+    return jd_data.keywords
+
+
+# ── Response Parsing ────────────────────────────────────────────────────────
+
+def _parse_ai_response(response_text: str) -> dict:
+    """
+    Parse the AI response text into a Python dictionary.
+
+    Handles common AI response quirks:
+        - Markdown code block wrappers (```json ... ```)
+        - Leading/trailing whitespace
+        - Invalid JSON with trailing commas
+
+    Args:
+        response_text: Raw text from the Gemini API response.
+
+    Returns:
+        Parsed dictionary from the JSON response.
+
+    Raises:
+        ValueError: If the response cannot be parsed as valid JSON.
+    """
+    # Strip markdown code block markers if present
+    cleaned = response_text.strip()
+    cleaned = re.sub(r"^```(?:json)?\s*\n?", "", cleaned)
+    cleaned = re.sub(r"\n?```\s*$", "", cleaned)
+    cleaned = cleaned.strip()
+
+    # Remove trailing commas (common AI mistake)
+    cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
+
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError as e:
+        raise ValueError(
+            f"Failed to parse AI response as JSON: {e}\n"
+            f"Raw response:\n{response_text[:500]}"
+        ) from e

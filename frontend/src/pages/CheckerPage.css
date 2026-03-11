@@ -1,0 +1,150 @@
+/* CheckerPage.css — ATS Score Checker page */
+
+.checker-page {
+    padding: var(--space-8) 0 var(--space-16);
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: var(--space-10);
+}
+
+.page-title {
+    font-size: var(--font-size-3xl);
+    margin-bottom: var(--space-3);
+}
+
+.page-subtitle {
+    color: var(--color-text-secondary);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* ── Grid Layout ──────────────────────────────────────────────────────────── */
+.checker-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-8);
+    align-items: start;
+}
+
+.input-column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+}
+
+.results-column {
+    position: sticky;
+    top: 80px;
+}
+
+/* ── Input Sections ───────────────────────────────────────────────────────── */
+.input-section {
+    padding: var(--space-6);
+}
+
+.input-title {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--space-4);
+}
+
+.input-toggle {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+    padding: var(--space-1);
+    background: var(--color-bg-input);
+    border-radius: var(--border-radius-md);
+    width: fit-content;
+}
+
+.toggle-btn {
+    padding: var(--space-2) var(--space-4);
+    border: none;
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-family: var(--font-family);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.toggle-btn.active {
+    background: var(--color-accent-blue);
+    color: white;
+}
+
+.resume-textarea {
+    min-height: 200px;
+}
+
+.jd-textarea {
+    min-height: 180px;
+}
+
+/* ── Parse Info Badge ─────────────────────────────────────────────────────── */
+.parse-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+}
+
+.parse-badge {
+    padding: var(--space-1) var(--space-3);
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    color: #34d399;
+    border-radius: 999px;
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+}
+
+.parse-badge.warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.25);
+    color: #fbbf24;
+}
+
+/* ── Check Button ─────────────────────────────────────────────────────────── */
+.check-btn {
+    width: 100%;
+}
+
+.checker-error {
+    text-align: center;
+    color: var(--color-accent-red);
+    font-size: var(--font-size-sm);
+}
+
+/* ── Placeholder ──────────────────────────────────────────────────────────── */
+.results-placeholder {
+    text-align: center;
+    padding: var(--space-12);
+}
+
+.placeholder-icon {
+    font-size: 4rem;
+    display: block;
+    margin-bottom: var(--space-4);
+    opacity: 0.5;
+}
+
+.results-placeholder h3 {
+    margin-bottom: var(--space-3);
+    color: var(--color-text-secondary);
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+    .checker-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .results-column {
+        position: static;
+    }
+}

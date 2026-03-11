@@ -1,0 +1,150 @@
+% =============================================================================
+% Modern Professional — ATS-Optimized LaTeX Template
+% =============================================================================
+% A clean, elegant template suitable for all industries.
+% Slightly more spacious than Jake's Resume, with subtle styling.
+%
+% Uses Jinja2 custom delimiters: <<= =>> for variables, <<* *>> for blocks.
+% =============================================================================
+
+\documentclass[a4paper,11pt]{article}
+
+% ── Packages ────────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{titlesec}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+
+% ── Color Definitions ──────────────────────────────────────────────────────
+\definecolor{accent}{RGB}{50, 80, 140}
+\definecolor{darktext}{RGB}{40, 40, 40}
+
+% ── Page Setup ──────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\color{darktext}
+\urlstyle{same}
+\raggedbottom
+\raggedright
+
+% ── Section Formatting ──────────────────────────────────────────────────────
+\titleformat{\section}
+  {\vspace{-2pt}\color{accent}\scshape\raggedright\large\bfseries}
+  {}{0em}{}[\color{accent}\titlerule \vspace{-4pt}]
+
+% =============================================================================
+% DOCUMENT START
+% =============================================================================
+\begin{document}
+
+% ── Header ──────────────────────────────────────────────────────────────────
+\begin{center}
+    {\Huge \textbf{\color{accent}<<= name =>>}} \\[6pt]
+    <<* if location *>>{\small <<= location =>>}\\[2pt]<<* endif *>>
+    {\small
+    <<* if phone *>><<= phone =>><<* endif *>>
+    <<* if email *>> \quad $\cdot$ \quad \href{mailto:<<= email =>>}{<<= email =>>}<<* endif *>>
+    <<* if linkedin *>> \quad $\cdot$ \quad \href{https://<<= linkedin =>>}{<<= linkedin =>>}<<* endif *>>
+    <<* if github *>> \quad $\cdot$ \quad \href{https://<<= github =>>}{<<= github =>>}<<* endif *>>
+    }
+\end{center}
+
+\vspace{-4pt}
+
+% ── Professional Summary ────────────────────────────────────────────────────
+<<* if summary *>>
+\section{Professional Summary}
+\vspace{2pt}
+\small{<<= summary =>>}
+\vspace{4pt}
+<<* endif *>>
+
+% ── Experience ──────────────────────────────────────────────────────────────
+<<* if experience *>>
+\section{Professional Experience}
+<<* for exp in experience *>>
+\vspace{2pt}
+\noindent\textbf{<<= exp.title =>>} \hfill {\small <<= exp.start_date =>> -- <<= exp.end_date =>>} \\
+\textit{<<= exp.company =>>}<<* if exp.location *>>, <<= exp.location =>><<* endif *>>
+<<* if exp.bullets *>>
+\begin{itemize}[leftmargin=0.2in, topsep=2pt, itemsep=1pt]
+<<* for bullet in exp.bullets *>>
+    \item \small{<<= bullet =>>}
+<<* endfor *>>
+\end{itemize}
+<<* endif *>>
+\vspace{2pt}
+<<* endfor *>>
+<<* endif *>>
+
+% ── Education ───────────────────────────────────────────────────────────────
+<<* if education *>>
+\section{Education}
+<<* for edu in education *>>
+\vspace{2pt}
+\noindent\textbf{<<= edu.degree =>>} \hfill {\small <<= edu.graduation_date | default('', true) =>>} \\
+\textit{<<= edu.institution =>>}<<* if edu.location *>>, <<= edu.location =>><<* endif *>>
+<<* if edu.gpa *>> \\ \small{GPA: <<= edu.gpa =>>}<<* endif *>>
+<<* if edu.honors *>> \\ \small{<<= edu.honors =>>}<<* endif *>>
+\vspace{2pt}
+<<* endfor *>>
+<<* endif *>>
+
+% ── Skills ──────────────────────────────────────────────────────────────────
+<<* if skills *>>
+\section{Skills}
+\vspace{2pt}
+\begin{description}[leftmargin=0.15in, style=nextline, font=\normalfont\bfseries\small]
+<<* if skills.languages *>>
+    \item[Programming Languages:] \small{<<= skills.languages | join(', ') =>>}
+<<* endif *>>
+<<* if skills.frameworks *>>
+    \item[Frameworks \& Libraries:] \small{<<= skills.frameworks | join(', ') =>>}
+<<* endif *>>
+<<* if skills.tools *>>
+    \item[Tools \& Platforms:] \small{<<= skills.tools | join(', ') =>>}
+<<* endif *>>
+<<* if skills.other *>>
+    \item[Additional:] \small{<<= skills.other | join(', ') =>>}
+<<* endif *>>
+\end{description}
+<<* endif *>>
+
+% ── Projects ────────────────────────────────────────────────────────────────
+<<* if projects *>>
+\section{Projects}
+<<* for proj in projects *>>
+\vspace{2pt}
+\noindent\textbf{<<= proj.name =>>}<<* if proj.technologies *>> {\small| \textit{<<= proj.technologies =>>}}<<* endif *>> \hfill {\small <<= proj.date | default('', true) =>>}
+<<* if proj.bullets *>>
+\begin{itemize}[leftmargin=0.2in, topsep=2pt, itemsep=1pt]
+<<* for bullet in proj.bullets *>>
+    \item \small{<<= bullet =>>}
+<<* endfor *>>
+\end{itemize}
+<<* endif *>>
+\vspace{2pt}
+<<* endfor *>>
+<<* endif *>>
+
+% ── Certifications ──────────────────────────────────────────────────────────
+<<* if certifications *>>
+\section{Certifications}
+\begin{itemize}[leftmargin=0.2in, topsep=2pt, itemsep=1pt]
+<<* for cert in certifications *>>
+    \item \small{\textbf{<<= cert.name =>>}<<* if cert.issuer *>> -- <<= cert.issuer =>><<* endif *>><<* if cert.date *>> (<<= cert.date =>>)<<* endif *>>}
+<<* endfor *>>
+\end{itemize}
+<<* endif *>>
+
+\end{document}

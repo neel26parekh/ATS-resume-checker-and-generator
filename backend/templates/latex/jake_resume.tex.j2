@@ -1,0 +1,182 @@
+% =============================================================================
+% Jake's Resume — ATS-Optimized LaTeX Template
+% =============================================================================
+% Based on the popular Jake's Resume format, widely used in tech.
+% Clean single-column layout, no graphics, maximum ATS compatibility.
+%
+% This is a Jinja2 template — variables use <<= =>> delimiters.
+% =============================================================================
+
+\documentclass[letterpaper,11pt]{article}
+
+% ── Packages ────────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage{tabularx}
+
+% ── Page Setup ──────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-0.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% ── Section Formatting ──────────────────────────────────────────────────────
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+% ── Custom Commands ─────────────────────────────────────────────────────────
+\newcommand{\resumeItem}[1]{
+  \item\small{#1 \vspace{-2pt}}
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+% =============================================================================
+% DOCUMENT START
+% =============================================================================
+\begin{document}
+
+% ── Header / Contact ────────────────────────────────────────────────────────
+\begin{center}
+    \textbf{\Huge \scshape <<= name =>>} \\ \vspace{1pt}
+    \small
+    <<* if phone *>><<= phone =>> $|$<<* endif *>>
+    <<* if email *>>\href{mailto:<<= email =>>}{\underline{<<= email =>>}}<<* endif *>>
+    <<* if linkedin *>> $|$ \href{https://<<= linkedin =>>}{\underline{<<= linkedin =>>}}<<* endif *>>
+    <<* if github *>> $|$ \href{https://<<= github =>>}{\underline{<<= github =>>}}<<* endif *>>
+    <<* if location *>> $|$ <<= location =>><<* endif *>>
+\end{center}
+
+% ── Professional Summary ────────────────────────────────────────────────────
+<<* if summary *>>
+\section{Summary}
+  \small{<<= summary =>>}
+<<* endif *>>
+
+% ── Education ───────────────────────────────────────────────────────────────
+<<* if education *>>
+\section{Education}
+  \resumeSubHeadingListStart
+  <<* for edu in education *>>
+    \resumeSubheading
+      {<<= edu.institution =>>}{<<= edu.location | default('', true) =>>}
+      {<<= edu.degree =>>}{<<= edu.graduation_date | default('', true) =>>}
+      <<* if edu.gpa or edu.honors *>>
+      \resumeItemListStart
+        <<* if edu.gpa *>>\resumeItem{GPA: <<= edu.gpa =>>}<<* endif *>>
+        <<* if edu.honors *>>\resumeItem{<<= edu.honors =>>}<<* endif *>>
+      \resumeItemListEnd
+      <<* endif *>>
+  <<* endfor *>>
+  \resumeSubHeadingListEnd
+<<* endif *>>
+
+% ── Experience ──────────────────────────────────────────────────────────────
+<<* if experience *>>
+\section{Experience}
+  \resumeSubHeadingListStart
+  <<* for exp in experience *>>
+    \resumeSubheading
+      {<<= exp.title =>>}{<<= exp.start_date =>> -- <<= exp.end_date =>>}
+      {<<= exp.company =>>}{<<= exp.location | default('', true) =>>}
+      <<* if exp.bullets *>>
+      \resumeItemListStart
+        <<* for bullet in exp.bullets *>>
+        \resumeItem{<<= bullet =>>}
+        <<* endfor *>>
+      \resumeItemListEnd
+      <<* endif *>>
+  <<* endfor *>>
+  \resumeSubHeadingListEnd
+<<* endif *>>
+
+% ── Projects ────────────────────────────────────────────────────────────────
+<<* if projects *>>
+\section{Projects}
+  \resumeSubHeadingListStart
+  <<* for proj in projects *>>
+    \resumeProjectHeading
+      {\textbf{<<= proj.name =>>} $|$ \emph{\small{<<= proj.technologies | default('', true) =>>}}}{<<= proj.date | default('', true) =>>}
+      <<* if proj.bullets *>>
+      \resumeItemListStart
+        <<* for bullet in proj.bullets *>>
+        \resumeItem{<<= bullet =>>}
+        <<* endfor *>>
+      \resumeItemListEnd
+      <<* endif *>>
+  <<* endfor *>>
+  \resumeSubHeadingListEnd
+<<* endif *>>
+
+% ── Technical Skills ────────────────────────────────────────────────────────
+<<* if skills *>>
+\section{Technical Skills}
+  \begin{itemize}[leftmargin=0.15in, label={}]
+    \small{\item{
+    <<* if skills.languages *>>
+      \textbf{Languages}{: <<= skills.languages | join(', ') =>>} \\
+    <<* endif *>>
+    <<* if skills.frameworks *>>
+      \textbf{Frameworks}{: <<= skills.frameworks | join(', ') =>>} \\
+    <<* endif *>>
+    <<* if skills.tools *>>
+      \textbf{Developer Tools}{: <<= skills.tools | join(', ') =>>} \\
+    <<* endif *>>
+    <<* if skills.other *>>
+      \textbf{Other}{: <<= skills.other | join(', ') =>>}
+    <<* endif *>>
+    }}
+  \end{itemize}
+<<* endif *>>
+
+% ── Certifications ──────────────────────────────────────────────────────────
+<<* if certifications *>>
+\section{Certifications}
+  \resumeSubHeadingListStart
+  <<* for cert in certifications *>>
+    \resumeProjectHeading
+      {\textbf{<<= cert.name =>>} -- \emph{<<= cert.issuer | default('', true) =>>}}{<<= cert.date | default('', true) =>>}
+  <<* endfor *>>
+  \resumeSubHeadingListEnd
+<<* endif *>>
+
+\end{document}

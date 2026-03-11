@@ -1,0 +1,90 @@
+/* FileUploader.css — Drag & drop upload zone */
+
+.drop-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--border-radius-lg);
+    padding: var(--space-10);
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition-base);
+    background: var(--color-bg-glass);
+}
+
+.drop-zone:hover,
+.drop-zone.active {
+    border-color: var(--color-accent-blue);
+    background: rgba(59, 130, 246, 0.05);
+    box-shadow: var(--shadow-glow-blue);
+}
+
+.drop-zone.has-file {
+    border-style: solid;
+    border-color: var(--color-accent-green);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.drop-zone-input {
+    display: none;
+}
+
+.drop-zone-icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: var(--space-3);
+}
+
+.drop-zone-text {
+    color: var(--color-text-primary);
+    margin-bottom: var(--space-2);
+}
+
+.drop-zone-hint {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.drop-zone-uploading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+    color: var(--color-text-secondary);
+}
+
+.drop-zone-file {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+}
+
+.file-icon {
+    font-size: 2rem;
+}
+
+.file-info {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+.file-name {
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.file-size {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}
+
+.file-status {
+    font-size: 1.2rem;
+    margin-left: auto;
+}
+
+.upload-error {
+    margin-top: var(--space-3);
+    color: var(--color-accent-red);
+    font-size: var(--font-size-sm);
+    text-align: center;
+}
