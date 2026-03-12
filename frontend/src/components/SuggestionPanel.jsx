@@ -7,7 +7,19 @@
 
 import './SuggestionPanel.css';
 
-export default function SuggestionPanel({ suggestions }) {
+export default function SuggestionPanel({ suggestions, loading }) {
+    if (loading) {
+        return (
+            <div className="suggestion-panel score-section">
+                <h3 className="section-title">💡 Improvement Suggestions</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem 0', color: 'var(--text-muted)' }}>
+                    <span className="spinner"></span>
+                    <span>Generating AI suggestions...</span>
+                </div>
+            </div>
+        );
+    }
+
     if (!suggestions || suggestions.length === 0) return null;
 
     // Group by priority

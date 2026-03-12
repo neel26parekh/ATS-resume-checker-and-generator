@@ -8,17 +8,32 @@
  *   4. Clicking "Generate" to get a PDF + .tex download
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './GeneratorPage.css';
 
 export default function GeneratorPage() {
-    // ── State ──────────────────────────────────────────────────────
+    // ── State ──────────────────────────────────────────────
     const [templates, setTemplates] = useState([]);
     const [selectedTemplate, setSelectedTemplate] = useState('jake_resume');
     const [jobDescription, setJobDescription] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
+    const [rateLimitCountdown, setRateLimitCountdown] = useState(0);
+    const countdownRef = useRef(null);
+
+    const startCountdown = (seconds) => {
+        setRateLimitCountdown(seconds);
+        clearInterval(countdownRef.current);
+        countdownRef.current = setInterval(() => {
+            setRateLimitCountdown(prev => {
+                if (prev <= 1) { clearInterval(countdownRef.current); return 0; }
+                return prev - 1;
+            });
+        }, 1000);
+    };
+
+    useEffect(() => () => clearInterval(countdownRef.current), []);
 
     // Profile state
     const [profile, setProfile] = useState({
@@ -136,7 +151,10 @@ export default function GeneratorPage() {
             const data = await response.json();
             setResult(data);
         } catch (err) {
-            setError(err.message || 'Failed to generate resume.');
+            const msg = err.message || 'Failed to generate resume.';
+            const isRateLimit = msg.toLowerCase().includes('rate limit') || msg.includes('429');
+            setError(msg);
+            if (isRateLimit) startCountdown(60);
         } finally {
             setLoading(false);
         }
@@ -341,7 +359,17 @@ export default function GeneratorPage() {
                         )}
                     </button>
 
-                    {error && <p className="generator-error">{error}</p>}
+                    {error && (
+                        <div className="generator-error">
+                            <p>{error}</p>
+                            {rateLimitCountdown > 0
+                                ? <p style={{marginTop:'0.5rem', opacity:0.8}}>Retry in <strong>{rateLimitCountdown}s</strong>...</p>
+                                : error.toLowerCase().includes('rate limit') || error.includes('429')
+                                    ? <button className="btn btn-primary" style={{marginTop:'0.75rem'}} onClick={handleGenerate}>🔄 Try Again</button>
+                                    : null
+                            }
+                        </div>
+                    )}
 
                     {/* Result */}
                     {result && (

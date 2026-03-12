@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: ats-resume-checker
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false

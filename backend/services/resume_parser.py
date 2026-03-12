@@ -168,8 +168,6 @@ def _extract_from_pdf(file_path: Path) -> tuple[str, list[str]]:
                 "ATS systems cannot parse scanned/image-based PDFs."
             )
 
-    doc.close()
-
     # Check total page count
     if doc.page_count > 2:
         issues.append(
@@ -177,6 +175,7 @@ def _extract_from_pdf(file_path: Path) -> tuple[str, list[str]]:
             "prefer 1-2 page resumes."
         )
 
+    doc.close()
     return full_text, issues
 
 

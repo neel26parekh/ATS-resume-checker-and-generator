@@ -63,6 +63,48 @@ npm run dev
 
 Visit **http://localhost:5173** in your browser.
 
+## 🚢 Production Run (Single Server)
+
+This project is configured so FastAPI serves both API + built frontend.
+
+```bash
+# from repo root
+./start.sh start
+
+# useful commands
+./start.sh status
+./start.sh logs
+./start.sh restart
+./start.sh stop
+```
+
+Open **http://localhost:8000**.
+
+## ☁️ Deploy (Render via Docker)
+
+This repo includes `Dockerfile` and `render.yaml` for direct deployment.
+
+### Steps
+
+1. Push this repository to GitHub.
+2. In Render, create a new **Blueprint** service from this repo.
+3. Add environment variable:
+    - `GEMINI_API_KEY` = your Gemini key
+4. Deploy.
+
+Render will use:
+- `render.yaml` for service config
+- `Dockerfile` to build frontend + backend into one container
+- Health check: `/api/health`
+
+## ⚠️ Gemini Rate Limit Note (Free Tier)
+
+- Free-tier Gemini can still return `429` during traffic spikes.
+- The app now retries generation server-side with longer backoff and serialized requests.
+- If quota is exhausted globally, users may still need to wait ~2 minutes and retry.
+
+For production traffic, move to a higher Gemini quota tier.
+
 ## 📁 Project Structure
 
 ```

@@ -14,12 +14,19 @@ Usage:
     suggestions = await generate_detailed_suggestions(score_report, jd, resume_text)
 """
 
+import asyncio
 import json
 import re
 
 import google.generativeai as genai
+import typing_extensions as typing
 
 from config import settings
+
+class SuggestionSchema(typing.TypedDict):
+    category: str
+    priority: str
+    message: str
 from api.models.score import ATSScoreReport, Suggestion
 
 
@@ -118,7 +125,7 @@ async def _get_ai_suggestions(
     """
     try:
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
         # Build dimension breakdown string
         dim_lines = [
@@ -137,12 +144,36 @@ async def _get_ai_suggestions(
             resume_excerpt=resume_text[:2000],
         )
 
-        response = model.generate_content(prompt)
+        response = await model.generate_content_async(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                response_mime_type="application/json",
+                response_schema=list[SuggestionSchema],
+                temperature=0.2,
+            )
+        )
         response_text = response.text.strip()
 
         return _parse_ai_suggestions(response_text)
 
     except Exception as e:
+        err_str = str(e).lower()
+        if "429" in err_str or "quota" in err_str or "exhausted" in err_str or "resource_exhausted" in err_str:
+            # One automatic retry after a short wait
+            try:
+                print("⚠️  Rate limit on suggestions. Waiting 15s then retrying...")
+                await asyncio.sleep(15)
+                response = await model.generate_content_async(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        response_mime_type="application/json",
+                        response_schema=list[SuggestionSchema],
+                        temperature=0.2,
+                    )
+                )
+                return _parse_ai_suggestions(response.text.strip())
+            except Exception:
+                pass
         # AI suggestions are a nice-to-have — don't fail the whole flow
         print(f"⚠️ AI suggestion generation failed: {e}")
         return []
@@ -156,8 +187,14 @@ def _parse_ai_suggestions(response_text: str) -> list[Suggestion]:
     cleaned = re.sub(r"\n?```\s*$", "", cleaned)
     cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
 
+    # Protect against literal newlines inside JSON strings from AI
+    def clean_strings(match):
+        return match.group(0).replace('\n', ' ').replace('\r', '').replace('\t', ' ')
+    
+    cleaned = re.sub(r'"([^"\\]*(\\.[^"\\]*)*)"', clean_strings, cleaned)
+
     try:
-        items = json.loads(cleaned)
+        items = json.loads(cleaned, strict=False)
         if not isinstance(items, list):
             return []
 

@@ -12,8 +12,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
-from config import settings, UPLOAD_DIR, GENERATED_DIR
+from config import settings, UPLOAD_DIR, GENERATED_DIR, BASE_DIR
 from api.routes import health, resume, scoring, generation
 
 
@@ -77,3 +79,18 @@ app.include_router(health.router,     prefix="/api", tags=["Health"])
 app.include_router(resume.router,     prefix="/api", tags=["Resume"])
 app.include_router(scoring.router,    prefix="/api", tags=["Scoring"])
 app.include_router(generation.router, prefix="/api", tags=["Generation"])
+
+
+# ── Serve Frontend Build ────────────────────────────────────────────────────
+# Serve the Vite production build as static files.
+# This means only ONE server is needed in production — no Vite process.
+
+_FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
+
+if _FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIST / "assets")), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Catch-all: serve index.html for all non-API routes (SPA routing)."""
+        return FileResponse(str(_FRONTEND_DIST / "index.html"))

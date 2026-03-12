@@ -15,12 +15,25 @@ Usage:
     print(jd_data.required_skills)
 """
 
+import asyncio
 import json
 import re
 
 import google.generativeai as genai
+import typing_extensions as typing
 
 from config import settings
+
+class JobDescriptionSchema(typing.TypedDict):
+    title: str
+    company: str
+    required_skills: list[str]
+    preferred_skills: list[str]
+    experience_level: str
+    education: str
+    responsibilities: list[str]
+    industry: str
+    keywords: list[str]
 from api.models.job import JobDescription
 
 
@@ -43,7 +56,7 @@ def _configure_gemini() -> genai.GenerativeModel:
         )
 
     genai.configure(api_key=settings.GEMINI_API_KEY)
-    return genai.GenerativeModel("gemini-1.5-flash")
+    return genai.GenerativeModel("gemini-2.0-flash-lite")
 
 
 # ── JD Analysis Prompt ──────────────────────────────────────────────────────
@@ -54,7 +67,7 @@ You are an expert ATS (Applicant Tracking System) analyst. Analyze the following
 job description and extract structured information.
 
 Return your analysis as a JSON object with EXACTLY these fields:
-{
+{{
     "title": "The job title",
     "company": "Company name (or empty string if not found)",
     "required_skills": ["list of must-have skills and technologies"],
@@ -64,7 +77,7 @@ Return your analysis as a JSON object with EXACTLY these fields:
     "responsibilities": ["list of key job responsibilities (top 5-8)"],
     "industry": "Industry or domain (e.g., 'FinTech', 'Healthcare', 'E-commerce')",
     "keywords": ["ALL important keywords an ATS would scan for, including skills, tools, methodologies, certifications"]
-}
+}}
 
 Rules:
 - Extract ONLY what is explicitly mentioned in the JD. Do not infer or add skills not mentioned.
@@ -99,18 +112,47 @@ async def analyze_job_description(jd_text: str) -> JobDescription:
         ValueError: If the AI response cannot be parsed as valid JSON.
     """
     model = _configure_gemini()
-
-    # Build the prompt with the JD text
     prompt = JD_ANALYSIS_PROMPT.format(job_description=jd_text)
 
-    # Call Gemini API
-    response = model.generate_content(prompt)
-    response_text = response.text.strip()
-
-    # Parse the JSON response
-    parsed_data = _parse_ai_response(response_text)
-
-    return JobDescription(**parsed_data)
+    # Retry up to 3 times with exponential backoff on rate limit errors
+    for attempt in range(3):
+        try:
+            response = await model.generate_content_async(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    response_mime_type="application/json",
+                    response_schema=JobDescriptionSchema,
+                    temperature=0.2,
+                )
+            )
+            parsed_data = _parse_ai_response(response.text.strip())
+            return JobDescription(**parsed_data)
+        except Exception as e:
+            err_str = str(e).lower()
+            is_rate_limit = "429" in err_str or "quota" in err_str or "exhausted" in err_str or "resource_exhausted" in err_str
+            is_parse_error = isinstance(e, ValueError)
+            if is_rate_limit and attempt < 2:
+                wait = 15 * (attempt + 1)  # 15s, 30s
+                print(f"⚠️  Rate limit on JD analysis (attempt {attempt+1}). Waiting {wait}s...")
+                await asyncio.sleep(wait)
+                continue
+            if is_parse_error and attempt < 2:
+                # Retry parse errors with higher temperature
+                print(f"⚠️  Parse error on JD analysis (attempt {attempt+1}). Retrying...")
+                try:
+                    response = await model.generate_content_async(
+                        prompt,
+                        generation_config=genai.types.GenerationConfig(
+                            response_mime_type="application/json",
+                            response_schema=JobDescriptionSchema,
+                            temperature=0.7,
+                        )
+                    )
+                    parsed_data = _parse_ai_response(response.text.strip())
+                    return JobDescription(**parsed_data)
+                except Exception:
+                    pass
+            raise
 
 
 async def extract_keywords_from_jd(jd_text: str) -> list[str]:
@@ -139,6 +181,7 @@ def _parse_ai_response(response_text: str) -> dict:
         - Markdown code block wrappers (```json ... ```)
         - Leading/trailing whitespace
         - Invalid JSON with trailing commas
+        - Literal newline control characters inside strings
 
     Args:
         response_text: Raw text from the Gemini API response.
@@ -157,9 +200,16 @@ def _parse_ai_response(response_text: str) -> dict:
 
     # Remove trailing commas (common AI mistake)
     cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
+    
+    # Protect against literal newlines inside JSON strings from AI
+    def clean_strings(match):
+        return match.group(0).replace('\n', ' ').replace('\r', '').replace('\t', ' ')
+    
+    cleaned = re.sub(r'"([^"\\]*(\\.[^"\\]*)*)"', clean_strings, cleaned)
 
     try:
-        return json.loads(cleaned)
+        # strict=False allows unescaped control characters just in case
+        return json.loads(cleaned, strict=False)
     except json.JSONDecodeError as e:
         raise ValueError(
             f"Failed to parse AI response as JSON: {e}\n"

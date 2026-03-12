@@ -10,20 +10,36 @@
  * dimension breakdown, keyword analysis, and suggestions.
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import FileUploader from '../components/FileUploader.jsx';
 import ScoreReport from '../components/ScoreReport.jsx';
 import './CheckerPage.css';
 
 export default function CheckerPage() {
-    // ── State ──────────────────────────────────────────────────────
+    // ── State ──────────────────────────────────────────────
     const [resumeText, setResumeText] = useState('');
     const [jobDescription, setJobDescription] = useState('');
     const [resumeData, setResumeData] = useState(null);
     const [scoreReport, setScoreReport] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [loadingSuggestions, setLoadingSuggestions] = useState(false);
     const [error, setError] = useState('');
+    const [rateLimitCountdown, setRateLimitCountdown] = useState(0);
     const [inputMode, setInputMode] = useState('upload'); // 'upload' | 'paste'
+    const countdownRef = useRef(null);
+
+    const startCountdown = (seconds) => {
+        setRateLimitCountdown(seconds);
+        clearInterval(countdownRef.current);
+        countdownRef.current = setInterval(() => {
+            setRateLimitCountdown(prev => {
+                if (prev <= 1) { clearInterval(countdownRef.current); return 0; }
+                return prev - 1;
+            });
+        }, 1000);
+    };
+
+    useEffect(() => () => clearInterval(countdownRef.current), []);
 
     // ── Handlers ───────────────────────────────────────────────────
 
@@ -47,14 +63,17 @@ export default function CheckerPage() {
         setError('');
         setScoreReport(null);
 
+        const payload = {
+            resume_text: resumeText,
+            job_description_text: jobDescription,
+        };
+
         try {
+            // Phase 1: Get score fast (1 AI call)
             const response = await fetch('/api/score', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    resume_text: resumeText,
-                    job_description_text: jobDescription,
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (!response.ok) {
@@ -64,9 +83,34 @@ export default function CheckerPage() {
 
             const report = await response.json();
             setScoreReport(report);
+            setLoading(false);
+
+            // Phase 2: Load suggestions in background (second AI call)
+            setLoadingSuggestions(true);
+            try {
+                const sugResponse = await fetch('/api/suggestions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        score_report: report,
+                        job_description_text: jobDescription,
+                        resume_text: resumeText,
+                    }),
+                });
+                if (sugResponse.ok) {
+                    const suggestions = await sugResponse.json();
+                    setScoreReport(prev => ({ ...prev, suggestions }));
+                }
+            } catch (_) {
+                // Suggestions are non-critical, fail silently
+            } finally {
+                setLoadingSuggestions(false);
+            }
         } catch (err) {
-            setError(err.message || 'Failed to score resume. Is the backend running?');
-        } finally {
+            const msg = err.message || 'Failed to score resume. Is the backend running?';
+            const isRateLimit = msg.toLowerCase().includes('rate limit') || msg.includes('429');
+            setError(msg);
+            if (isRateLimit) startCountdown(60);
             setLoading(false);
         }
     };
@@ -154,7 +198,8 @@ export default function CheckerPage() {
                     <button
                         className="btn btn-primary btn-lg check-btn"
                         onClick={handleCheckScore}
-                        disabled={loading || !resumeText.trim() || !jobDescription.trim()}
+                        disabled={loading || !resumeText || !jobDescription}
+                        style={{ marginTop: '1rem', width: '100%' }}
                     >
                         {loading ? (
                             <>
@@ -166,25 +211,35 @@ export default function CheckerPage() {
                         )}
                     </button>
 
-                    {error && <p className="checker-error">{error}</p>}
+                    {error && (
+                        <div className="checker-error">
+                            <p>{error}</p>
+                            {rateLimitCountdown > 0
+                                ? <p style={{marginTop:'0.5rem', opacity:0.8}}>Retry in <strong>{rateLimitCountdown}s</strong>...</p>
+                                : error.toLowerCase().includes('rate limit') || error.includes('429')
+                                    ? <button className="btn btn-primary" style={{marginTop:'0.75rem'}} onClick={handleCheckScore}>🔄 Try Again</button>
+                                    : null
+                            }
+                        </div>
+                    )}
                 </div>
 
                 {/* ── Right Column: Results ─────────────────────────────── */}
                 <div className="results-column">
-                    {loading && (
+                    {loading ? (
                         <div className="loading-overlay glass-card">
                             <div className="spinner spinner-lg"></div>
                             <h3>Analyzing Your Resume</h3>
                             <p className="text-muted">
-                                Running 7-dimension ATS analysis with AI...
+                                Running ATS analysis with AI...
                             </p>
                         </div>
-                    )}
+                    ) : null}
 
-                    {scoreReport && <ScoreReport report={scoreReport} />}
+                    {scoreReport && <ScoreReport report={scoreReport} loadingSuggestions={loadingSuggestions} />}
 
                     {!scoreReport && !loading && (
-                        <div className="results-placeholder glass-card">
+                        <div className="results-placeholder glass-card" style={{ position: 'sticky', top: '2rem' }}>
                             <span className="placeholder-icon">📊</span>
                             <h3>Your Score Report Will Appear Here</h3>
                             <p className="text-muted">

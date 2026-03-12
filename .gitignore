@@ -26,6 +26,7 @@ frontend/dist/
 # ── Uploads & Generated Files ───────────────────────────────────────────────
 uploads/
 generated/
+.server.pid
 *.aux
 *.log
 *.out

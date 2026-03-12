@@ -46,6 +46,9 @@ async def save_upload(file: UploadFile) -> Path:
     unique_name = f"{uuid.uuid4().hex}{extension}"
     save_path = UPLOAD_DIR / unique_name
 
+    # Ensure the upload directory exists
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+
     # Write file contents to disk
     content = await file.read()
     save_path.write_bytes(content)

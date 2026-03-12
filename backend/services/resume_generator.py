@@ -23,8 +23,56 @@ import json
 import re
 
 import google.generativeai as genai
+import typing_extensions as typing
 
 from config import settings
+
+class ExperienceSchema(typing.TypedDict):
+    title: str
+    company: str
+    location: str
+    start_date: str
+    end_date: str
+    bullets: list[str]
+
+class EducationSchema(typing.TypedDict):
+    degree: str
+    institution: str
+    location: str
+    graduation_date: str
+    gpa: str
+    honors: str
+
+class SkillsSchema(typing.TypedDict):
+    languages: list[str]
+    frameworks: list[str]
+    tools: list[str]
+    other: list[str]
+
+class ProjectSchema(typing.TypedDict):
+    name: str
+    technologies: str
+    date: str
+    bullets: list[str]
+
+class CertificationSchema(typing.TypedDict):
+    name: str
+    issuer: str
+    date: str
+
+class ResumeSchema(typing.TypedDict):
+    name: str
+    email: str
+    phone: str
+    linkedin: str
+    github: str
+    location: str
+    summary: str
+    experience: list[ExperienceSchema]
+    education: list[EducationSchema]
+    skills: SkillsSchema
+    projects: list[ProjectSchema]
+    certifications: list[CertificationSchema]
 
 
 # ── Resume Generation Prompt ────────────────────────────────────────────────
@@ -140,7 +188,7 @@ async def generate_resume(
         )
 
     genai.configure(api_key=settings.GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
     # Format the profile data as readable text
     profile_text = _format_profile(profile)
@@ -154,10 +202,38 @@ async def generate_resume(
         keywords=keywords_str,
     )
 
-    response = model.generate_content(prompt)
-    response_text = response.text.strip()
-
-    return _parse_resume_response(response_text)
+    # Attempt 1
+    try:
+        response = await model.generate_content_async(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                response_mime_type="application/json",
+                response_schema=ResumeSchema,
+                temperature=0.2,
+            )
+        )
+        response_text = response.text.strip()
+        
+        # Parse the JSON
+        parsed_data = _parse_resume_response(response_text)
+        return parsed_data
+        
+    except ValueError as e:
+        print(f"DEBUG: Resume Generation AI parsing failed on Attempt 1. Retrying... Error: {e}")
+        # Attempt 2: Higher temperature
+        response = await model.generate_content_async(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                response_mime_type="application/json",
+                response_schema=ResumeSchema,
+                temperature=0.7,
+            )
+        )
+        response_text = response.text.strip()
+        
+        # Parse the JSON
+        parsed_data = _parse_resume_response(response_text)
+        return parsed_data
 
 
 # ── Profile Formatting ──────────────────────────────────────────────────────

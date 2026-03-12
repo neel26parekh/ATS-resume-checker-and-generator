@@ -13,7 +13,7 @@ import RadarChart from './RadarChart.jsx';
 import SuggestionPanel from './SuggestionPanel.jsx';
 import './ScoreReport.css';
 
-export default function ScoreReport({ report }) {
+export default function ScoreReport({ report, loadingSuggestions }) {
     if (!report) return null;
 
     const { overall_score, grade, dimensions, summary, keywords_found, keywords_missing } = report;
@@ -114,7 +114,7 @@ export default function ScoreReport({ report }) {
             </div>
 
             {/* ── Suggestions ──────────────────────────────────────────── */}
-            <SuggestionPanel suggestions={report.suggestions} />
+            <SuggestionPanel suggestions={report.suggestions} loading={loadingSuggestions} />
         </div>
     );
 }
