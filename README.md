@@ -160,4 +160,4 @@ ats-resume-checker/
 
 ## 📄 License
 
-MIT License — Free to use, modify, and distribute.
+Apache License 2.0 - Free to use, modify, and distribute under the Apache 2.0 terms.
