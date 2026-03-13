@@ -151,8 +151,8 @@ async def analyze_job_description(jd_text: str) -> JobDescription:
             is_rate_limit = "429" in err_str or "quota" in err_str or "exhausted" in err_str or "resource_exhausted" in err_str
             is_parse_error = isinstance(e, ValueError)
             if is_rate_limit and attempt < 2:
-                wait = 15 * (attempt + 1)  # 15s, 30s
-                print(f"⚠️  Rate limit on JD analysis (attempt {attempt+1}). Waiting {wait}s...")
+                wait = 5
+                print(f"WARNING: Rate limit on JD analysis (attempt {attempt+1}). Retrying in {wait}s...")
                 await asyncio.sleep(wait)
                 continue
             if is_parse_error and attempt < 2:
