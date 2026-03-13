@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from config import GENERATED_DIR
 from services.resume_generator import generate_resume, generate_resume_fallback
-from services.latex_compiler import render_and_compile, get_available_templates
+from services.latex_compiler import render_and_compile, render_and_compile_basic, get_available_templates
 
 router = APIRouter()
 _generation_lock = asyncio.Lock()
@@ -92,10 +92,17 @@ async def generate_resume_endpoint(request: GenerateRequest):
                 else:
                     raise
 
-            result = await render_and_compile(
-                resume_data=resume_content,
-                template_id=request.template_id,
-            )
+            try:
+                result = await render_and_compile(
+                    resume_data=resume_content,
+                    template_id=request.template_id,
+                )
+            except Exception as render_error:
+                if "expected an expression" in str(render_error).lower():
+                    print("WARNING: Template render failed. Using basic LaTeX renderer fallback.")
+                    result = await render_and_compile_basic(resume_content)
+                else:
+                    raise
 
             job_id = result["job_id"]
             if used_fallback:

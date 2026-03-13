@@ -131,6 +131,32 @@ async def render_and_compile(
     }
 
 
+async def render_and_compile_basic(resume_data: dict) -> dict:
+    """
+    Render a minimal LaTeX resume without Jinja templates.
+
+    This is a safety fallback when template parsing fails.
+    """
+    job_id = uuid.uuid4().hex[:12]
+    output_dir = GENERATED_DIR / job_id
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    tex_path = output_dir / "resume.tex"
+    tex_content = _build_basic_tex(resume_data)
+    tex_path.write_text(tex_content, encoding="utf-8")
+
+    success, error = _compile_latex(tex_path, output_dir)
+    pdf_path = output_dir / "resume.pdf"
+
+    return {
+        "pdf_path": str(pdf_path) if pdf_path.exists() else None,
+        "tex_path": str(tex_path),
+        "success": success,
+        "error": error,
+        "job_id": job_id,
+    }
+
+
 # ── Template Rendering ──────────────────────────────────────────────────────
 
 def _render_template(template_file: str, resume_data: dict) -> str:
@@ -152,6 +178,83 @@ def _render_template(template_file: str, resume_data: dict) -> str:
     escaped_data = _escape_latex_recursive(resume_data)
 
     return template.render(**escaped_data)
+
+
+def _build_basic_tex(resume_data: dict) -> str:
+    """Build a simple ATS-friendly LaTeX document directly from resume data."""
+    name = _escape_latex(str(resume_data.get("name", "")))
+    email = _escape_latex(str(resume_data.get("email", "")))
+    phone = _escape_latex(str(resume_data.get("phone", "")))
+    linkedin = _escape_latex(str(resume_data.get("linkedin", "")))
+    github = _escape_latex(str(resume_data.get("github", "")))
+    location = _escape_latex(str(resume_data.get("location", "")))
+    summary = _escape_latex(str(resume_data.get("summary", "")))
+
+    lines = [
+        r"\documentclass[11pt]{article}",
+        r"\usepackage[margin=1in]{geometry}",
+        r"\usepackage[T1]{fontenc}",
+        r"\usepackage[utf8]{inputenc}",
+        r"\begin{document}",
+        rf"\section*{{{name or 'Resume'}}}",
+        rf"{email} \quad {phone} \quad {linkedin} \quad {github} \quad {location}",
+    ]
+
+    if summary:
+        lines.extend([r"\section*{Summary}", summary])
+
+    experience = resume_data.get("experience", []) or []
+    if experience:
+        lines.append(r"\section*{Experience}")
+        for exp in experience:
+            title = _escape_latex(str(exp.get("title", "")))
+            company = _escape_latex(str(exp.get("company", "")))
+            start_date = _escape_latex(str(exp.get("start_date", "")))
+            end_date = _escape_latex(str(exp.get("end_date", "")))
+            lines.append(rf"\textbf{{{title}}} - {company} ({start_date} -- {end_date})")
+            bullets = exp.get("bullets", []) or []
+            if bullets:
+                lines.append(r"\begin{itemize}")
+                for b in bullets[:5]:
+                    lines.append(rf"\item {_escape_latex(str(b))}")
+                lines.append(r"\end{itemize}")
+
+    education = resume_data.get("education", []) or []
+    if education:
+        lines.append(r"\section*{Education}")
+        for edu in education:
+            degree = _escape_latex(str(edu.get("degree", "")))
+            inst = _escape_latex(str(edu.get("institution", "")))
+            grad = _escape_latex(str(edu.get("graduation_date", "")))
+            lines.append(rf"\textbf{{{degree}}} - {inst} ({grad})")
+
+    skills = resume_data.get("skills", {}) or {}
+    if skills:
+        lines.append(r"\section*{Skills}")
+        if isinstance(skills, dict):
+            skill_values = []
+            for key in ["languages", "frameworks", "tools", "other"]:
+                skill_values.extend(skills.get(key, []) or [])
+        else:
+            skill_values = skills
+        skill_text = _escape_latex(", ".join([str(s) for s in skill_values if str(s).strip()]))
+        lines.append(skill_text)
+
+    projects = resume_data.get("projects", []) or []
+    if projects:
+        lines.append(r"\section*{Projects}")
+        for proj in projects:
+            pname = _escape_latex(str(proj.get("name", "")))
+            lines.append(rf"\textbf{{{pname}}}")
+            pbullets = proj.get("bullets", []) or []
+            if pbullets:
+                lines.append(r"\begin{itemize}")
+                for b in pbullets[:4]:
+                    lines.append(rf"\item {_escape_latex(str(b))}")
+                lines.append(r"\end{itemize}")
+
+    lines.append(r"\end{document}")
+    return "\n".join(lines)
 
 
 def _escape_latex(text: str) -> str:
