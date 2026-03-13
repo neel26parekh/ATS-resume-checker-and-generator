@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from api.models.score import ScoreRequest, ATSScoreReport
 from api.models.job import JobAnalysisRequest, JobAnalysisResponse
 from api.models.resume import ResumeData
-from services.jd_analyzer import analyze_job_description
+from services.jd_analyzer import analyze_job_description, _analyze_job_description_fallback
 from services.scoring_engine import calculate_ats_score
 from services.suggestion_engine import generate_detailed_suggestions
 from services.resume_parser import _detect_sections, _extract_contact_info, _extract_skills_from_sections
@@ -60,15 +60,17 @@ async def score_resume(request: ScoreRequest):
     if not request.job_description_text.strip():
         raise HTTPException(status_code=400, detail="Job description text is required.")
 
+    # Shared local parser used in normal and fallback paths.
+    def _parse_resume():
+        cleaned_text = clean_text(request.resume_text)
+        sections = _detect_sections(cleaned_text)
+        contact_info = _extract_contact_info(cleaned_text)
+        detected_skills = _extract_skills_from_sections(sections)
+        return cleaned_text, sections, contact_info, detected_skills
+
     try:
         # Steps 1 & 2 run concurrently — JD analysis (AI) and resume parsing (CPU)
         # are fully independent, so we don't need to wait on one before starting the other.
-        def _parse_resume():
-            cleaned_text = clean_text(request.resume_text)
-            sections = _detect_sections(cleaned_text)
-            contact_info = _extract_contact_info(cleaned_text)
-            detected_skills = _extract_skills_from_sections(sections)
-            return cleaned_text, sections, contact_info, detected_skills
 
         loop = asyncio.get_running_loop()
         job_description, (cleaned_text, sections, contact_info, detected_skills) = await asyncio.gather(
@@ -100,10 +102,20 @@ async def score_resume(request: ScoreRequest):
         
         error_msg = str(e).lower()
         if "429" in error_msg or "quota" in error_msg or "exhausted" in error_msg:
-            raise HTTPException(
-                status_code=429,
-                detail="AI API Rate Limit Exceeded. Please wait a minute and try again."
+            # Route-level safety net: return score using deterministic JD fallback.
+            print("WARNING: AI rate-limited in /score route. Using fallback JD analysis.")
+            cleaned_text, sections, contact_info, detected_skills = _parse_resume()
+            resume_data = ResumeData(
+                raw_text=cleaned_text,
+                sections=sections,
+                contact_info=contact_info,
+                detected_skills=detected_skills,
+                formatting_issues=[],
+                file_type="text",
             )
+            jd_fallback = _analyze_job_description_fallback(request.job_description_text)
+            score_report = await calculate_ats_score(resume_data, jd_fallback)
+            return score_report
 
         raise HTTPException(
             status_code=500,
