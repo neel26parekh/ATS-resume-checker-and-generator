@@ -122,6 +122,14 @@ async def render_and_compile(
 
     pdf_path = output_dir / "resume.pdf"
 
+    if not success and error and error.startswith("No LaTeX compiler found"):
+        fb_success, fb_error = _compile_pdf_fallback(resume_data, pdf_path)
+        if fb_success:
+            success = True
+            error = None
+        else:
+            error = f"{error}\n\nPDF fallback failed: {fb_error}"
+
     return {
         "pdf_path": str(pdf_path) if pdf_path.exists() else None,
         "tex_path": str(tex_path),
@@ -147,6 +155,14 @@ async def render_and_compile_basic(resume_data: dict) -> dict:
 
     success, error = _compile_latex(tex_path, output_dir)
     pdf_path = output_dir / "resume.pdf"
+
+    if not success and error and error.startswith("No LaTeX compiler found"):
+        fb_success, fb_error = _compile_pdf_fallback(resume_data, pdf_path)
+        if fb_success:
+            success = True
+            error = None
+        else:
+            error = f"{error}\n\nPDF fallback failed: {fb_error}"
 
     return {
         "pdf_path": str(pdf_path) if pdf_path.exists() else None,
@@ -426,3 +442,81 @@ def _extract_latex_error(log_text: str) -> str:
 
     # Fallback: return last 200 characters of log
     return f"LaTeX compilation failed. Log excerpt: {log_text[-200:]}"
+
+
+def _compile_pdf_fallback(resume_data: dict, pdf_path: Path) -> tuple[bool, str | None]:
+    """Generate a simple PDF resume without LaTeX using reportlab."""
+    try:
+        from reportlab.lib.pagesizes import letter
+        from reportlab.pdfgen import canvas
+    except Exception:
+        return False, "reportlab is not installed"
+
+    try:
+        c = canvas.Canvas(str(pdf_path), pagesize=letter)
+        width, height = letter
+        y = height - 40
+
+        def draw_line(text: str, font: str = "Helvetica", size: int = 10, gap: int = 14):
+            nonlocal y
+            if y < 40:
+                c.showPage()
+                y = height - 40
+            c.setFont(font, size)
+            c.drawString(40, y, text[:120])
+            y -= gap
+
+        name = str(resume_data.get("name", "Resume"))
+        draw_line(name, font="Helvetica-Bold", size=16, gap=20)
+
+        contact = " | ".join([
+            str(resume_data.get("email", "")),
+            str(resume_data.get("phone", "")),
+            str(resume_data.get("linkedin", "")),
+            str(resume_data.get("github", "")),
+            str(resume_data.get("location", "")),
+        ]).strip(" |")
+        if contact:
+            draw_line(contact, size=9, gap=18)
+
+        summary = str(resume_data.get("summary", "")).strip()
+        if summary:
+            draw_line("Summary", font="Helvetica-Bold", size=12, gap=14)
+            draw_line(summary, size=10, gap=16)
+
+        experience = resume_data.get("experience", []) or []
+        if experience:
+            draw_line("Experience", font="Helvetica-Bold", size=12, gap=14)
+            for exp in experience:
+                title = str(exp.get("title", ""))
+                company = str(exp.get("company", ""))
+                dates = f"{exp.get('start_date', '')} - {exp.get('end_date', '')}".strip(" -")
+                draw_line(f"{title} | {company} | {dates}", font="Helvetica-Bold", size=10, gap=12)
+                for b in (exp.get("bullets", []) or [])[:4]:
+                    draw_line(f"- {str(b)}", size=9, gap=11)
+
+        education = resume_data.get("education", []) or []
+        if education:
+            draw_line("Education", font="Helvetica-Bold", size=12, gap=14)
+            for edu in education:
+                draw_line(
+                    f"{edu.get('degree', '')} | {edu.get('institution', '')} | {edu.get('graduation_date', '')}",
+                    size=10,
+                    gap=12,
+                )
+
+        skills = resume_data.get("skills", {}) or {}
+        skill_values = []
+        if isinstance(skills, dict):
+            for key in ["languages", "frameworks", "tools", "other"]:
+                skill_values.extend(skills.get(key, []) or [])
+        elif isinstance(skills, list):
+            skill_values = skills
+        if skill_values:
+            draw_line("Skills", font="Helvetica-Bold", size=12, gap=14)
+            draw_line(", ".join(str(s) for s in skill_values[:24]), size=10, gap=14)
+
+        c.save()
+        return True, None
+    except Exception as e:
+        return False, str(e)
