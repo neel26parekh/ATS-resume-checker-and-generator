@@ -37,6 +37,17 @@ class JobDescriptionSchema(typing.TypedDict):
 from api.models.job import JobDescription
 
 
+# Common technology and ATS terms for heuristic keyword extraction fallback.
+COMMON_SKILLS = {
+    "python", "java", "javascript", "typescript", "sql", "nosql", "react", "node", "fastapi",
+    "django", "flask", "spring", "aws", "azure", "gcp", "docker", "kubernetes", "git",
+    "ci/cd", "linux", "rest", "graphql", "pandas", "numpy", "scikit-learn", "tensorflow",
+    "pytorch", "spark", "hadoop", "airflow", "tableau", "power bi", "excel", "communication",
+    "leadership", "problem solving", "agile", "scrum", "microservices", "testing", "pytest",
+    "unit testing", "integration testing", "data analysis", "machine learning", "nlp", "llm",
+}
+
+
 # ── Gemini Configuration ────────────────────────────────────────────────────
 
 def _configure_gemini() -> genai.GenerativeModel:
@@ -111,6 +122,14 @@ async def analyze_job_description(jd_text: str) -> JobDescription:
         RuntimeError: If Gemini API is not configured.
         ValueError: If the AI response cannot be parsed as valid JSON.
     """
+    if not jd_text.strip():
+        return JobDescription()
+
+    # If Gemini is unavailable, always use deterministic fallback so scoring still works.
+    if not settings.is_gemini_configured:
+        print("WARNING: Gemini not configured. Using fallback JD analyzer.")
+        return _analyze_job_description_fallback(jd_text)
+
     model = _configure_gemini()
     prompt = JD_ANALYSIS_PROMPT.format(job_description=jd_text)
 
@@ -152,7 +171,116 @@ async def analyze_job_description(jd_text: str) -> JobDescription:
                     return JobDescription(**parsed_data)
                 except Exception:
                     pass
-            raise
+            # Last attempt failed: return fallback instead of failing the request.
+            if attempt == 2:
+                print("WARNING: Gemini JD analysis failed after retries. Using fallback analyzer.")
+                return _analyze_job_description_fallback(jd_text)
+
+    # Safety net; should not normally execute.
+    return _analyze_job_description_fallback(jd_text)
+
+
+def _analyze_job_description_fallback(jd_text: str) -> JobDescription:
+    """
+    Lightweight non-AI JD parser used when Gemini is unavailable or rate-limited.
+
+    Goal: keep ATS scoring functional with best-effort extracted fields.
+    """
+    text = jd_text.strip()
+    lowered = text.lower()
+
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+
+    # Title: prefer explicit role-like first line, otherwise empty.
+    title = ""
+    for ln in lines[:8]:
+        if any(word in ln.lower() for word in ["engineer", "developer", "analyst", "manager", "scientist", "designer", "specialist"]):
+            title = ln[:120]
+            break
+
+    # Experience level extraction.
+    exp_match = re.search(r"(\d+\+?\s*(?:years?|yrs?))", lowered)
+    if exp_match:
+        experience_level = exp_match.group(1)
+    elif any(k in lowered for k in ["senior", "lead", "principal"]):
+        experience_level = "Senior"
+    elif any(k in lowered for k in ["entry", "junior", "associate", "intern"]):
+        experience_level = "Entry Level"
+    else:
+        experience_level = ""
+
+    # Education extraction.
+    edu_match = re.search(r"((?:bachelor|master|phd|b\.s\.|m\.s\.|bs|ms)[^\n\r\.;]*)", lowered)
+    education = edu_match.group(1).strip().title() if edu_match else ""
+
+    # Required / preferred split using sentence-level heuristics.
+    sentence_chunks = re.split(r"[\n\r\.]+", text)
+    required_chunks = []
+    preferred_chunks = []
+    for chunk in sentence_chunks:
+        c = chunk.strip()
+        if not c:
+            continue
+        c_low = c.lower()
+        if any(k in c_low for k in ["required", "must have", "minimum qualifications"]):
+            required_chunks.append(c)
+        elif any(k in c_low for k in ["preferred", "nice to have", "plus", "bonus"]):
+            preferred_chunks.append(c)
+
+    # Keyword extraction: known terms + frequent technical tokens.
+    found_common = [s for s in COMMON_SKILLS if s in lowered]
+    token_candidates = re.findall(r"\b[a-zA-Z][a-zA-Z0-9\-\+\.]{2,}\b", text)
+    token_counts = {}
+    for tok in token_candidates:
+        t = tok.lower()
+        if t in {"the", "and", "for", "with", "you", "are", "our", "will", "this", "that", "from", "your", "have"}:
+            continue
+        if t.isdigit():
+            continue
+        token_counts[t] = token_counts.get(t, 0) + 1
+
+    frequent_tokens = sorted(token_counts.items(), key=lambda x: x[1], reverse=True)
+    frequent_keywords = [t for t, _ in frequent_tokens[:30]]
+
+    keywords = []
+    for kw in found_common + frequent_keywords:
+        if kw not in keywords:
+            keywords.append(kw)
+
+    # Skills lists from keywords.
+    required_skills = []
+    preferred_skills = []
+    for kw in keywords:
+        if kw in COMMON_SKILLS:
+            if any(kw in rc.lower() for rc in required_chunks):
+                required_skills.append(kw)
+            elif any(kw in pc.lower() for pc in preferred_chunks):
+                preferred_skills.append(kw)
+
+    # If buckets are empty, seed required from strongest detected skills.
+    if not required_skills:
+        required_skills = [kw for kw in keywords if kw in COMMON_SKILLS][:12]
+
+    # Responsibilities: collect bullet-like lines with action verbs.
+    responsibilities = []
+    for ln in lines:
+        l_low = ln.lower()
+        if any(v in l_low for v in ["develop", "design", "build", "maintain", "lead", "analyze", "implement", "collaborate", "manage", "optimize"]):
+            responsibilities.append(ln[:160])
+        if len(responsibilities) >= 8:
+            break
+
+    return JobDescription(
+        title=title,
+        company="",
+        required_skills=required_skills,
+        preferred_skills=preferred_skills,
+        experience_level=experience_level,
+        education=education,
+        responsibilities=responsibilities,
+        industry="",
+        keywords=keywords[:50],
+    )
 
 
 async def extract_keywords_from_jd(jd_text: str) -> list[str]:
