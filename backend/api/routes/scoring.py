@@ -69,14 +69,27 @@ async def score_resume(request: ScoreRequest):
         return cleaned_text, sections, contact_info, detected_skills
 
     try:
-        # Steps 1 & 2 run concurrently — JD analysis (AI) and resume parsing (CPU)
-        # are fully independent, so we don't need to wait on one before starting the other.
-
+        # Parse resume and analyze JD concurrently. If JD analysis is slow/rate-limited,
+        # force a quick deterministic fallback so users still get a score fast.
         loop = asyncio.get_running_loop()
-        job_description, (cleaned_text, sections, contact_info, detected_skills) = await asyncio.gather(
-            analyze_job_description(request.job_description_text),
-            loop.run_in_executor(None, _parse_resume),
-        )
+        parse_future = loop.run_in_executor(None, _parse_resume)
+        jd_task = asyncio.create_task(analyze_job_description(request.job_description_text))
+
+        cleaned_text, sections, contact_info, detected_skills = await parse_future
+
+        try:
+            job_description = await asyncio.wait_for(jd_task, timeout=12)
+        except asyncio.TimeoutError:
+            jd_task.cancel()
+            print("WARNING: JD analysis timed out. Using fallback analyzer.")
+            job_description = _analyze_job_description_fallback(request.job_description_text)
+        except Exception as jd_error:
+            jd_msg = str(jd_error).lower()
+            if "429" in jd_msg or "quota" in jd_msg or "exhausted" in jd_msg:
+                print("WARNING: JD analysis rate-limited. Using fallback analyzer.")
+                job_description = _analyze_job_description_fallback(request.job_description_text)
+            else:
+                raise
 
         resume_data = ResumeData(
             raw_text=cleaned_text,
