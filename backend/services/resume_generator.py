@@ -21,6 +21,7 @@ Usage:
 
 import json
 import re
+from collections.abc import Iterable
 
 import google.generativeai as genai
 import typing_extensions as typing
@@ -182,10 +183,7 @@ async def generate_resume(
         ValueError: If AI response cannot be parsed.
     """
     if not settings.is_gemini_configured:
-        raise RuntimeError(
-            "Gemini API key required for resume generation. "
-            "Set GEMINI_API_KEY in your .env file."
-        )
+        return generate_resume_fallback(profile, job_description_text)
 
     genai.configure(api_key=settings.GEMINI_API_KEY)
     model = genai.GenerativeModel("gemini-2.0-flash-lite")
@@ -234,6 +232,155 @@ async def generate_resume(
         # Parse the JSON
         parsed_data = _parse_resume_response(response_text)
         return parsed_data
+    except Exception as e:
+        err = str(e).lower()
+        if "429" in err or "quota" in err or "exhausted" in err or "resource_exhausted" in err:
+            print("WARNING: Resume generation rate-limited. Using fallback generator.")
+            return generate_resume_fallback(profile, job_description_text)
+        raise
+
+
+def generate_resume_fallback(profile: dict, job_description_text: str) -> dict:
+    """Generate a deterministic resume structure when AI is unavailable.
+
+    This keeps /api/generate functional under quota/rate-limit failures.
+    """
+    jd_keywords = _extract_jd_keywords(job_description_text)
+
+    name = str(profile.get("name", "")).strip()
+    email = str(profile.get("email", "")).strip()
+    phone = str(profile.get("phone", "")).strip()
+    linkedin = str(profile.get("linkedin", "")).strip()
+    github = str(profile.get("github", "")).strip()
+    location = str(profile.get("location", "")).strip()
+
+    # Build summary from available profile/JD data without fabrication.
+    top_keywords = ", ".join(jd_keywords[:6])
+    summary_parts = []
+    if name:
+        summary_parts.append(f"{name} is a results-focused professional")
+    else:
+        summary_parts.append("Results-focused professional")
+    if top_keywords:
+        summary_parts.append(f"with experience in {top_keywords}")
+    summary_parts.append("seeking to contribute to this role")
+    summary = " ".join(summary_parts) + "."
+
+    experiences = []
+    for exp in _as_list(profile.get("experience")):
+        if not isinstance(exp, dict):
+            continue
+        desc = str(exp.get("description", "")).strip()
+        bullets = _description_to_bullets(desc)
+        if not bullets:
+            bullets = ["Delivered responsibilities aligned with team and project goals."]
+        experiences.append({
+            "title": str(exp.get("title", "")).strip() or "Role",
+            "company": str(exp.get("company", "")).strip() or "Company",
+            "location": str(exp.get("location", "")).strip(),
+            "start_date": str(exp.get("start_date", "")).strip(),
+            "end_date": str(exp.get("end_date", "")).strip() or "Present",
+            "bullets": bullets[:4],
+        })
+
+    education = []
+    for edu in _as_list(profile.get("education")):
+        if not isinstance(edu, dict):
+            continue
+        education.append({
+            "degree": str(edu.get("degree", "")).strip(),
+            "institution": str(edu.get("institution", "")).strip(),
+            "location": str(edu.get("location", "")).strip(),
+            "graduation_date": str(edu.get("graduation_date", "")).strip(),
+            "gpa": str(edu.get("gpa", "")).strip(),
+            "honors": str(edu.get("honors", "")).strip(),
+        })
+
+    raw_skills = profile.get("skills", [])
+    all_skills = [s.strip() for s in _as_list(raw_skills) if str(s).strip()]
+    skills = {
+        "languages": all_skills[:6],
+        "frameworks": all_skills[6:12],
+        "tools": all_skills[12:18],
+        "other": all_skills[18:] + jd_keywords[:6],
+    }
+
+    projects = []
+    for proj in _as_list(profile.get("projects")):
+        if not isinstance(proj, dict):
+            continue
+        pdesc = str(proj.get("description", "")).strip()
+        projects.append({
+            "name": str(proj.get("name", "")).strip() or "Project",
+            "technologies": ", ".join(all_skills[:5]),
+            "date": str(proj.get("date", "")).strip(),
+            "bullets": _description_to_bullets(pdesc)[:3] or ["Built and delivered project outcomes."],
+        })
+
+    certs = []
+    for cert in _as_list(profile.get("certifications")):
+        cert_name = str(cert).strip()
+        if cert_name:
+            certs.append({"name": cert_name, "issuer": "", "date": ""})
+
+    return _validate_resume_structure({
+        "name": name,
+        "email": email,
+        "phone": phone,
+        "linkedin": linkedin,
+        "github": github,
+        "location": location,
+        "summary": summary,
+        "experience": experiences,
+        "education": education,
+        "skills": skills,
+        "projects": projects,
+        "certifications": certs,
+    })
+
+
+def _as_list(value) -> list:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        return [v.strip() for v in value.split(",") if v.strip()]
+    if isinstance(value, Iterable):
+        return list(value)
+    return [value]
+
+
+def _extract_jd_keywords(jd_text: str) -> list[str]:
+    tokens = re.findall(r"\b[a-zA-Z][a-zA-Z0-9\-\+\.]{2,}\b", jd_text.lower())
+    stop = {
+        "the", "and", "for", "with", "you", "are", "our", "will", "this", "that", "from",
+        "your", "have", "not", "all", "job", "role", "team", "work", "years", "year",
+        "required", "preferred", "nice", "must", "experience", "skills",
+    }
+    keywords = []
+    for t in tokens:
+        if t in stop or t.isdigit():
+            continue
+        if t not in keywords:
+            keywords.append(t)
+        if len(keywords) >= 20:
+            break
+    return keywords
+
+
+def _description_to_bullets(text: str) -> list[str]:
+    chunks = [c.strip() for c in re.split(r"[\n\.;]+", text) if c.strip()]
+    bullets = []
+    for c in chunks:
+        if len(c) < 8:
+            continue
+        # Ensure bullet starts with capitalized action-like phrasing.
+        line = c[0].upper() + c[1:]
+        if not line.endswith("."):
+            line += "."
+        bullets.append(line)
+    return bullets
 
 
 # ── Profile Formatting ──────────────────────────────────────────────────────

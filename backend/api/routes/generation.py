@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from config import GENERATED_DIR
-from services.resume_generator import generate_resume
+from services.resume_generator import generate_resume, generate_resume_fallback
 from services.latex_compiler import render_and_compile, get_available_templates
 
 router = APIRouter()
@@ -68,71 +68,68 @@ async def generate_resume_endpoint(request: GenerateRequest):
         raise HTTPException(status_code=400, detail="Job description text is required.")
 
     # Serialize generation calls to reduce burst traffic against Gemini limits.
-    # This prevents overlapping generate requests from repeatedly hitting quota.
     async with _generation_lock:
-        last_error = None
-        backoff_schedule = [30, 60, 90]  # total wait budget before final failure: 180s
-        for attempt in range(1, len(backoff_schedule) + 2):
+        try:
             try:
-                resume_content = await generate_resume(
-                    profile=request.profile,
-                    job_description_text=request.job_description_text,
-                    jd_keywords=None,
-                )
-
-                result = await render_and_compile(
-                    resume_data=resume_content,
-                    template_id=request.template_id,
-                )
-
-                job_id = result["job_id"]
-
-                return GenerateResponse(
-                    success=True,
-                    message=(
-                        "Resume generated successfully!"
-                        if result["success"]
-                        else "Resume content generated. LaTeX compilation failed."
+                # Keep AI attempt short; fallback is deterministic and reliable.
+                resume_content = await asyncio.wait_for(
+                    generate_resume(
+                        profile=request.profile,
+                        job_description_text=request.job_description_text,
+                        jd_keywords=None,
                     ),
-                    job_id=job_id,
-                    pdf_available=result["success"],
-                    tex_available=True,
-                    download_url_pdf=f"/api/download/{job_id}/pdf" if result["success"] else None,
-                    download_url_tex=f"/api/download/{job_id}/tex",
-                    compilation_error=result.get("error"),
+                    timeout=15,
+                )
+                used_fallback = False
+            except Exception as e:
+                if _is_rate_limited(e) or isinstance(e, asyncio.TimeoutError):
+                    print("WARNING: AI generation unavailable. Using deterministic fallback resume generator.")
+                    resume_content = generate_resume_fallback(
+                        profile=request.profile,
+                        job_description_text=request.job_description_text,
+                    )
+                    used_fallback = True
+                else:
+                    raise
+
+            result = await render_and_compile(
+                resume_data=resume_content,
+                template_id=request.template_id,
+            )
+
+            job_id = result["job_id"]
+            if used_fallback:
+                message = (
+                    "Resume generated successfully using fallback mode."
+                    if result["success"]
+                    else "Resume generated in fallback mode. LaTeX compilation failed."
+                )
+            else:
+                message = (
+                    "Resume generated successfully!"
+                    if result["success"]
+                    else "Resume content generated. LaTeX compilation failed."
                 )
 
-            except HTTPException:
-                raise
-            except RuntimeError as e:
-                raise HTTPException(status_code=503, detail=str(e))
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e))
-            except Exception as e:
-                is_rate_limit = _is_rate_limited(e)
+            return GenerateResponse(
+                success=True,
+                message=message,
+                job_id=job_id,
+                pdf_available=result["success"],
+                tex_available=True,
+                download_url_pdf=f"/api/download/{job_id}/pdf" if result["success"] else None,
+                download_url_tex=f"/api/download/{job_id}/tex",
+                compilation_error=result.get("error"),
+            )
 
-                if is_rate_limit and attempt <= len(backoff_schedule):
-                    wait_secs = backoff_schedule[attempt - 1]
-                    print(
-                        f"Rate limit on generation attempt {attempt}/{len(backoff_schedule) + 1}. "
-                        f"Waiting {wait_secs}s..."
-                    )
-                    await asyncio.sleep(wait_secs)
-                    continue
-
-                last_error = e
-
-                if is_rate_limit:
-                    raise HTTPException(
-                        status_code=429,
-                        detail="AI API Rate Limit. The server retried automatically but quota is still exhausted. Please wait 2 minutes and try again."
-                    )
-                raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
-
-        raise HTTPException(
-            status_code=500,
-            detail=f"Generation failed after retries: {str(last_error)}"
-        )
+        except HTTPException:
+            raise
+        except RuntimeError as e:
+            raise HTTPException(status_code=503, detail=str(e))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
 
 
 @router.get("/download/{job_id}/{file_type}")
